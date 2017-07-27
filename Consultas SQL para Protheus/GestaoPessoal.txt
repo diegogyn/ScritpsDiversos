@@ -1,0 +1,10 @@
+-- Exemplo de select para relacionar 2 tabelas com mesmos campos para adicionar valores
+
+SELECT RA_NOME,RD_MAT,RD_HORAS,STR(RD_VALOR,10,2),RD_DATARQ,RD_DATPGT,RD_CC
+FROM SRD010 A,SRA010 B
+WHERE A.RD_FILIAL = B.RA_FILIAL
+AND A.RD_MAT = B.RA_MAT
+AND A.RD_DATARQ >= '200601' 
+AND A.RD_DATARQ <= '200612' 
+AND A.RD_PD = '497'
+AND A.D_E_L_E_T_ <> '*'

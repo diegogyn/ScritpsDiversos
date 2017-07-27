@@ -1,0 +1,2 @@
+# EXEMPLO MONTAGEM DE VOLUME NFS EM SERVIDOR FREENAS
+mount -t nfs 192.168.200.7:/DataVolume/bkp/areca /mnt/areca
