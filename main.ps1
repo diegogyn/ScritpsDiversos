@@ -13,16 +13,13 @@
 
 function Show-Menu {
     Clear-Host
-    # Logo UFG em ASCII Art
     Write-Host @"  
-
 	 ██╗   ██╗███████╗ ██████╗ 
 	 ██║   ██║██╔════╝██╔════╝ 
 	 ██║   ██║█████╗  ██║  ███╗
 	 ██║   ██║██╔══╝  ██║   ██║
 	 ╚██████╔╝██║     ╚██████╔╝
 	  ╚═════╝ ╚═╝      ╚═════╝ 
-
     Universidade Federal de Goiás
 "@ -ForegroundColor Blue
 
@@ -46,7 +43,7 @@ function Invoke-PressKey {
 
 function Testar-Admin {
     if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-        Write-Host "[⚠️] Elevando privilégios..." -ForegroundColor Yellow
+        Write-Host "[⚠] Elevando privilégios..." -ForegroundColor Yellow
         Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -Command `"irm https://raw.githubusercontent.com/diegogyn/ScritpsDiversos/refs/heads/master/main.ps1 | iex`"" -Verb RunAs
         exit
     }
@@ -74,7 +71,7 @@ function Listar-ProgramasInstalados {
             Out-File -FilePath $filePath -Width 200
 
         Write-Host "[📂] Relatório salvo em: $filePath" -ForegroundColor Green
-        Write-Host "[ℹ️] Programas encontrados: $($apps.Count)" -ForegroundColor Cyan
+        Write-Host "[ℹ] Programas encontrados: $($apps.Count)" -ForegroundColor Cyan
     }
     catch {
         Write-Host "[❗] Erro na geração do relatório: $($_.Exception.Message)" -ForegroundColor Red
@@ -113,7 +110,7 @@ function Alterar-NomeComputador {
 
 function Aplicar-GPOsFCT {
     try {
-        Write-Host "`n[🏛️] Conectando ao servidor de políticas..." -ForegroundColor DarkMagenta
+        Write-Host "`n[🏛] Conectando ao servidor de políticas..." -ForegroundColor DarkMagenta
         
         $gpoPaths = @{
             User    = "\\fog\gpos\user.txt"
@@ -130,7 +127,7 @@ function Aplicar-GPOsFCT {
         }
 
         Write-Host "[✅] Políticas aplicadas com sucesso!" -ForegroundColor Green
-        Write-Host "[⚠️] Recomenda-se reinicialização do sistema" -ForegroundColor Yellow
+        Write-Host "[⚠] Recomenda-se reinicialização do sistema" -ForegroundColor Yellow
     }
     catch {
         Write-Host "[❗] Falha na aplicação: $($_.Exception.Message)" -ForegroundColor Red
@@ -160,7 +157,7 @@ function Restaurar-PoliticasPadrao {
         }
 
         Write-Host "[✅] Restauração concluída!" -ForegroundColor Green
-        Write-Host "[⚠️] Execute a opção 5 para atualizar as políticas" -ForegroundColor Yellow
+        Write-Host "[⚠] Execute a opção 5 para atualizar as políticas" -ForegroundColor Yellow
     }
     catch {
         Write-Host "[❗] Erro na restauração: $($_.Exception.Message)" -ForegroundColor Red
@@ -192,7 +189,7 @@ function Atualizar-PoliticasGrupo {
 
 function Reiniciar-LojaWindows {
     try {
-        Write-Host "`n[🛠️] Iniciando reset avançado da Microsoft Store..." -ForegroundColor Yellow
+        Write-Host "`n[🛠] Iniciando reset avançado da Microsoft Store..." -ForegroundColor Yellow
         
         $etapas = @(
             @{Nome = "Resetando ACLs"; Comando = { icacls "C:\Program Files\WindowsApps" /reset /t /c /q | Out-Null }},
@@ -242,10 +239,10 @@ function Limpeza-Labs {
                 
                 Write-Host "│  ├─ Limpando perfil: $(Split-Path $UserPath -Leaf)" -ForegroundColor DarkGray
 
-                # Carregar registry hive do usuário
+                # Carregar registry hive
                 reg load "HKU\$SID" "$UserPath\ntuser.dat" 2>&1 | Out-Null
 
-                # 2.1 Limpeza de arquivos temporários do usuário
+                # 2.1 Arquivos temporários
                 $UserTempPaths = @(
                     "$UserPath\AppData\Local\Temp\*",
                     "$UserPath\AppData\Local\Microsoft\Windows\INetCache\*",
@@ -266,16 +263,16 @@ function Limpeza-Labs {
                     }
                 }
 
-                # 2.3 Remover personalizações
+                # 2.3 Personalizações
                 Remove-Item "$UserPath\Desktop\*", "$UserPath\Downloads\*" -Force -Exclude 'desktop.ini' -ErrorAction SilentlyContinue
                 Remove-Item "$UserPath\AppData\Roaming\Microsoft\Windows\Themes\*" -Force -ErrorAction SilentlyContinue
 
-                # 2.4 Limpar credenciais e configurações
+                # 2.4 Credenciais
                 cmdkey /list | ForEach-Object { 
                     if ($_ -like "*Target:*") { cmdkey /del:($_ -split ' ')[2] }
                 }
 
-                # Descarregar registry hive
+                # Descarregar hive
                 [gc]::Collect()
                 reg unload "HKU\$SID" 2>&1 | Out-Null
 
@@ -284,23 +281,23 @@ function Limpeza-Labs {
             }
         }
 
-        # 3. Reset configurações de sistema
-        Write-Host "├─ Etapa 3/4: Resetando configurações do sistema..." -ForegroundColor Cyan
+        # 3. Reset configurações
+        Write-Host "├─ Etapa 3/4: Resetando configurações..." -ForegroundColor Cyan
         powercfg /restoredefaultschemes | Out-Null
         netsh winsock reset | Out-Null
         netsh int ip reset | Out-Null
 
-        # 4. Limpeza profunda do sistema
-        Write-Host "├─ Etapa 4/4: Limpeza profunda do Windows..." -ForegroundColor Cyan
+        # 4. Limpeza profunda
+        Write-Host "├─ Etapa 4/4: Limpeza profunda..." -ForegroundColor Cyan
         Start-Process cleanmgr -ArgumentList "/sagerun:1" -Wait -NoNewWindow
         DISM /Online /Cleanup-Image /RestoreHealth | Out-Null
         sfc /scannow | Out-Null
 
         Write-Host "[✅] Limpeza concluída com sucesso!" -ForegroundColor Green
-        Write-Host "[⚠] Recomenda-se reinicialização do sistema" -ForegroundColor Yellow
+        Write-Host "[⚠] Recomenda-se reinicialização" -ForegroundColor Yellow
     }
     catch {
-        Write-Host "[❗] Erro crítico durante a limpeza: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[❗] Erro crítico: $($_.Exception.Message)" -ForegroundColor Red
     }
     finally {
         Invoke-PressKey
@@ -309,7 +306,7 @@ function Limpeza-Labs {
 
 function Reiniciar-Computador {
     try {
-        Write-Host "`n[🚨] ATENÇÃO: Esta operação é irreversível!" -ForegroundColor Red
+        Write-Host "`n[🚨] ATENÇÃO: Operação irreversível!" -ForegroundColor Red
         $confirmacao = Read-Host "`nCONFIRME com 'REINICIAR' para prosseguir"
         if ($confirmacao -eq 'REINICIAR') {
             Write-Host "[⏳] Reinício em 15 segundos..." -ForegroundColor Yellow
@@ -325,7 +322,7 @@ function Reiniciar-Computador {
     }
 }
 
-# Main Execution
+# Execução Principal
 Testar-Admin
 
 while ($true) {
