@@ -7,7 +7,7 @@
 .DESCRIPTION
     Execute com: irm RAW_URL_MAIN | iex
 .NOTES
-    Versão: 2.2
+    Versão: 2.3
     Autor: Departamento de TI UFG
 #>
 
@@ -28,14 +28,15 @@ function Show-Menu {
 
     Write-Host "`n          Campus Aparecida`n" -ForegroundColor Yellow
     Write-Host "══════════════════════════════════════════════════════════" -ForegroundColor Cyan
-    Write-Host " 1. 🔄 Atualizar Políticas de Grupo" -ForegroundColor Green
-    Write-Host " 2. 🛒 Resetar Loja Windows" -ForegroundColor Blue
-    Write-Host " 3. 📜 Listar Programas Instalados" -ForegroundColor Magenta
-    Write-Host " 4. 💻 Alterar Nome do Computador" -ForegroundColor Cyan
-    Write-Host " 5. 🏛 Aplicar GPOs da FCT" -ForegroundColor Green
-    Write-Host " 6. 🧹 Restaurar GPOs Padrão do Windows" -ForegroundColor Blue
-    Write-Host " 7. 🚀 Reiniciar Computador" -ForegroundColor Red
-    Write-Host " 8. ❌ Sair do Script" -ForegroundColor DarkGray
+    Write-Host " 1. 📜 Listar Programas Instalados" -ForegroundColor Magenta
+    Write-Host " 2. 💻 Alterar Nome do Computador" -ForegroundColor Cyan
+    Write-Host " 3. 🏛 Aplicar GPOs da FCT" -ForegroundColor DarkMagenta
+    Write-Host " 4. 🧹 Restaurar GPOs Padrão do Windows" -ForegroundColor DarkYellow
+    Write-Host " 5. 🔄 Atualizar GPOs" -ForegroundColor Green
+    Write-Host " 6. 🛒 Reset Windows Store" -ForegroundColor Blue
+    Write-Host " 7. 🧼 Limpeza de Labs" -ForegroundColor DarkCyan
+    Write-Host " 8. 🚀 Reiniciar Computador" -ForegroundColor Red
+    Write-Host " 9. ❌ Sair do Script" -ForegroundColor DarkGray
     Write-Host "══════════════════════════════════════════════════════════" -ForegroundColor Cyan
 }
 
@@ -51,62 +52,11 @@ function Testar-Admin {
     }
 }
 
-function Atualizar-PoliticasGrupo {
-    try {
-        Write-Host "`n[🔄] Forçando atualização de políticas..." -ForegroundColor Yellow
-        $output = gpupdate /force 2>&1
-        
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "[✅] Atualização concluída: $($output -join ' ')" -ForegroundColor Green
-        }
-        else {
-            Write-Host "[❌] Erro ${LASTEXITCODE}: $output" -ForegroundColor Red
-        }
-    }
-    catch {
-        Write-Host "[❗] Erro crítico: $($_.Exception.Message)" -ForegroundColor Red
-    }
-    finally {
-        Invoke-PressKey
-    }
-}
-
-function Reiniciar-LojaWindows {
-    try {
-        Write-Host "`n[🛠️] Iniciando reset avançado da Microsoft Store..." -ForegroundColor Yellow
-        
-        $etapas = @(
-            @{Nome = "Resetando ACLs"; Comando = { icacls "C:\Program Files\WindowsApps" /reset /t /c /q | Out-Null }},
-            @{Nome = "Executando WSReset"; Comando = { Start-Process wsreset -NoNewWindow }},
-            @{Nome = "Finalizando processos"; Comando = { taskkill /IM wsreset.exe /IM WinStore.App.exe /F | Out-Null }}
-        )
-
-        foreach ($etapa in $etapas) {
-            Write-Host "├─ $($etapa.Nome)..." -ForegroundColor Cyan
-            & $etapa.Comando
-            
-            if ($etapa.Nome -eq "Executando WSReset") {
-                Write-Host "│  Aguardando conclusão..." -ForegroundColor DarkGray
-                Start-Sleep -Seconds 30
-            }
-        }
-        
-        Write-Host "[✅] Loja reinicializada com sucesso!`n" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "[❗] Falha no processo: $($_.Exception.Message)" -ForegroundColor Red
-    }
-    finally {
-        Invoke-PressKey
-    }
-}
-
 function Listar-ProgramasInstalados {
     try {
         $dateStamp = Get-Date -Format "yyyyMMdd-HHmmss"
         $fileName = "apps-instalados-$dateStamp.txt"
-        $documentsPath = [Environment]::GetFolderPath("MyDocuments")
-        $filePath = Join-Path -Path $documentsPath -ChildPath $fileName
+        $filePath = Join-Path -Path "C:\" -ChildPath $fileName
 
         Write-Host "`n[🔍] Coletando dados de programas instalados..." -ForegroundColor Yellow
         
@@ -123,7 +73,7 @@ function Listar-ProgramasInstalados {
             Format-Table -AutoSize |
             Out-File -FilePath $filePath -Width 200
 
-        Write-Host "[📂] Relatório gerado: $filePath" -ForegroundColor Green
+        Write-Host "[📂] Relatório salvo em: $filePath" -ForegroundColor Green
         Write-Host "[ℹ️] Programas encontrados: $($apps.Count)" -ForegroundColor Cyan
     }
     catch {
@@ -210,10 +160,87 @@ function Restaurar-PoliticasPadrao {
         }
 
         Write-Host "[✅] Restauração concluída!" -ForegroundColor Green
-        Write-Host "[⚠️] Execute a opção 1 para atualizar as políticas" -ForegroundColor Yellow
+        Write-Host "[⚠️] Execute a opção 5 para atualizar as políticas" -ForegroundColor Yellow
     }
     catch {
         Write-Host "[❗] Erro na restauração: $($_.Exception.Message)" -ForegroundColor Red
+    }
+    finally {
+        Invoke-PressKey
+    }
+}
+
+function Atualizar-PoliticasGrupo {
+    try {
+        Write-Host "`n[🔄] Forçando atualização de políticas..." -ForegroundColor Yellow
+        $output = gpupdate /force 2>&1
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[✅] Atualização concluída: $($output -join ' ')" -ForegroundColor Green
+        }
+        else {
+            Write-Host "[❌] Erro ${LASTEXITCODE}: $output" -ForegroundColor Red
+        }
+    }
+    catch {
+        Write-Host "[❗] Erro crítico: $($_.Exception.Message)" -ForegroundColor Red
+    }
+    finally {
+        Invoke-PressKey
+    }
+}
+
+function Reiniciar-LojaWindows {
+    try {
+        Write-Host "`n[🛠️] Iniciando reset avançado da Microsoft Store..." -ForegroundColor Yellow
+        
+        $etapas = @(
+            @{Nome = "Resetando ACLs"; Comando = { icacls "C:\Program Files\WindowsApps" /reset /t /c /q | Out-Null }},
+            @{Nome = "Executando WSReset"; Comando = { Start-Process wsreset -NoNewWindow }},
+            @{Nome = "Finalizando processos"; Comando = { taskkill /IM wsreset.exe /IM WinStore.App.exe /F | Out-Null }}
+        )
+
+        foreach ($etapa in $etapas) {
+            Write-Host "├─ $($etapa.Nome)..." -ForegroundColor Cyan
+            & $etapa.Comando
+            
+            if ($etapa.Nome -eq "Executando WSReset") {
+                Write-Host "│  Aguardando conclusão..." -ForegroundColor DarkGray
+                Start-Sleep -Seconds 30
+            }
+        }
+        
+        Write-Host "[✅] Loja reinicializada com sucesso!`n" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "[❗] Falha no processo: $($_.Exception.Message)" -ForegroundColor Red
+    }
+    finally {
+        Invoke-PressKey
+    }
+}
+
+function Limpeza-Labs {
+    try {
+        Write-Host "`n[🧼] Iniciando limpeza de laboratório..." -ForegroundColor DarkCyan
+        
+        # Limpar arquivos temporários
+        Write-Host "├─ Limpando arquivos temporários..." -ForegroundColor Cyan
+        Remove-Item -Path "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "C:\Windows\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
+        
+        # Limpar a Lixeira
+        Write-Host "├─ Esvaziando a Lixeira..." -ForegroundColor Cyan
+        Clear-RecycleBin -Force -ErrorAction SilentlyContinue
+        
+        # Limpar cache do Store
+        Write-Host "├─ Limpando cache da Loja Windows..." -ForegroundColor Cyan
+        Get-ChildItem -Path "C:\Users\*\AppData\Local\Packages\Microsoft.WindowsStore*" -Recurse | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        
+        Write-Host "[✅] Limpeza concluída com sucesso!" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "[❗] Erro durante a limpeza: $($_.Exception.Message)" -ForegroundColor Red
     }
     finally {
         Invoke-PressKey
@@ -244,15 +271,16 @@ Testar-Admin
 while ($true) {
     try {
         Show-Menu
-        switch (Read-Host "`nSelecione uma opção [1-8]") {
-            '1' { Atualizar-PoliticasGrupo }
-            '2' { Reiniciar-LojaWindows }
-            '3' { Listar-ProgramasInstalados }
-            '4' { Alterar-NomeComputador }
-            '5' { Aplicar-GPOsFCT }
-            '6' { Restaurar-PoliticasPadrao }
-            '7' { Reiniciar-Computador }
-            '8' { exit }
+        switch (Read-Host "`nSelecione uma opção [1-9]") {
+            '1' { Listar-ProgramasInstalados }
+            '2' { Alterar-NomeComputador }
+            '3' { Aplicar-GPOsFCT }
+            '4' { Restaurar-PoliticasPadrao }
+            '5' { Atualizar-PoliticasGrupo }
+            '6' { Reiniciar-LojaWindows }
+            '7' { Limpeza-Labs }
+            '8' { Reiniciar-Computador }
+            '9' { exit }
             default {
                 Write-Host "[❌] Opção inválida!" -ForegroundColor Red
                 Start-Sleep -Seconds 1
