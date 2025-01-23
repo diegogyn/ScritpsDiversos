@@ -242,18 +242,27 @@ function Limpeza-Labs {
                 # Carregar registry hive
                 reg load "HKU\$SID" "$UserPath\ntuser.dat" 2>&1 | Out-Null
 
-                # 2.1 Arquivos temporários
-                $UserTempPaths = @(
+                # 2.1 Limpeza completa sem prompts
+                $PastasParaLimpar = @(
                     "$UserPath\AppData\Local\Temp\*",
                     "$UserPath\AppData\Local\Microsoft\Windows\INetCache\*",
-                    "$UserPath\AppData\Local\Microsoft\Windows\History\*"
+                    "$UserPath\AppData\Local\Microsoft\Windows\History\*",
+                    "$UserPath\AppData\Roaming\Microsoft\Windows\Recent\*"  # Arquivos recentes
                 )
-                Remove-Item $UserTempPaths -Force -Recurse -ErrorAction SilentlyContinue
+                
+                # 2.2 Excluir conteúdo mantendo ícones
+                Remove-Item $PastasParaLimpar -Recurse -Force -ErrorAction SilentlyContinue
+                
+                # 2.3 Área de trabalho (exceto íones do sistema)
+                Remove-Item "$UserPath\Desktop\*" -Recurse -Force -Exclude 'desktop.ini', '*.lnk' -ErrorAction SilentlyContinue
+                
+                # 2.4 Downloads (limpeza completa)
+                Remove-Item "$UserPath\Downloads\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-                # 2.2 Reset navegadores
+                # 2.5 Reset navegadores
                 $Browsers = @(
-                    @{ Name = "Chrome"; Path = "$UserPath\AppData\Local\Google\Chrome\User Data\Default" },
-                    @{ Name = "Edge"; Path = "$UserPath\AppData\Local\Microsoft\Edge\User Data\Default" },
+                    @{ Name = "Chrome"; Path = "$UserPath\AppData\Local\Google\Chrome\User Data\Default\*" },
+                    @{ Name = "Edge"; Path = "$UserPath\AppData\Local\Microsoft\Edge\User Data\Default\*" },
                     @{ Name = "Firefox"; Path = "$UserPath\AppData\Roaming\Mozilla\Firefox\Profiles\*" }
                 )
 
@@ -263,11 +272,7 @@ function Limpeza-Labs {
                     }
                 }
 
-                # 2.3 Personalizações
-                Remove-Item "$UserPath\Desktop\*", "$UserPath\Downloads\*" -Force -Exclude 'desktop.ini' -ErrorAction SilentlyContinue
-                Remove-Item "$UserPath\AppData\Roaming\Microsoft\Windows\Themes\*" -Force -ErrorAction SilentlyContinue
-
-                # 2.4 Credenciais
+                # 2.6 Credenciais
                 cmdkey /list | ForEach-Object { 
                     if ($_ -like "*Target:*") { cmdkey /del:($_ -split ' ')[2] }
                 }
@@ -277,7 +282,7 @@ function Limpeza-Labs {
                 reg unload "HKU\$SID" 2>&1 | Out-Null
 
             } catch {
-		Write-Host "│  └─ [⚠] Erro no perfil ${UserPath}∶ $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "│  └─ [⚠] Erro no perfil ${UserPath}∶ $($_.Exception.Message)" -ForegroundColor Red
             }
         }
 
