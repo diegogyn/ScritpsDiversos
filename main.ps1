@@ -3,9 +3,12 @@
 
 <#
 .SYNOPSIS
-    Script Modular de Manutenção Windows
+    Script Modular de Manutenção Windows - UFG Campus Aparecida
 .DESCRIPTION
     Execute com: irm RAW_URL_MAIN | iex
+.NOTES
+    Versão: 2.0
+    Autor: Departamento de TI UFG
 #>
 
 function Show-Menu {
@@ -29,206 +32,238 @@ function Show-Menu {
     Write-Host " 2. 🛒 Resetar Loja Windows" -ForegroundColor Blue
     Write-Host " 3. 📜 Listar Programas Instalados" -ForegroundColor Magenta
     Write-Host " 4. 💻 Alterar Nome do Computador" -ForegroundColor Cyan
-    Write-Host " 5. 🚀 Reiniciar Computador" -ForegroundColor Red
-    Write-Host " 6.  Aplicar GPOs da FCT/UFG" -ForegroundColor DarkMagenta
-    Write-Host " 7. 🧹 Restaurar GPOs Padrão do Windows" -ForegroundColor DarkYellow
+    Write-Host " 5. 🏛 Aplicar GPOs da FCT" -ForegroundColor DarkMagenta
+    Write-Host " 6. 🧹 Restaurar GPOs Padrão do Windows" -ForegroundColor DarkYellow
+    Write-Host " 7. 🚀 Reiniciar Computador" -ForegroundColor Red
     Write-Host " 8. ❌ Sair do Script" -ForegroundColor DarkGray
     Write-Host "══════════════════════════════════════════════════════════" -ForegroundColor Cyan
 }
 
+function Invoke-PressKey {
+    Read-Host "`nPressione Enter para continuar..."
+}
+
+function Testar-Admin {
+    if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+        Write-Host "[⚠️] Elevando privilégios..." -ForegroundColor Yellow
+        Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -Command `"irm RAW_URL_MAIN | iex`"" -Verb RunAs
+        exit
+    }
+}
+
 function Atualizar-PoliticasGrupo {
-    Write-Host "`n[🔄] Atualizando políticas de grupo..." -ForegroundColor Yellow
     try {
+        Write-Host "`n[🔄] Forçando atualização de políticas..." -ForegroundColor Yellow
         $output = gpupdate /force 2>&1
+        
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "[✅] Políticas atualizadas com sucesso!" -ForegroundColor Green
-        } else {
-            Write-Host "[❌] Erro na atualização: $output" -ForegroundColor Red
+            Write-Host "[✅] Atualização concluída: $($output -join ' ')" -ForegroundColor Green
+        }
+        else {
+            Write-Host "[❌] Erro $LASTEXITCODE: $output" -ForegroundColor Red
         }
     }
     catch {
         Write-Host "[❗] Erro crítico: $($_.Exception.Message)" -ForegroundColor Red
     }
-    Read-Host "`nPressione Enter para continuar..."
+    finally {
+        Invoke-PressKey
+    }
 }
 
 function Reiniciar-LojaWindows {
-    Write-Host "`n[🛠️] Iniciando processo de reset da Loja Windows..." -ForegroundColor Yellow
     try {
-        Write-Host "├─ Etapa 1/3: Resetando permissões..." -ForegroundColor Cyan
-        Start-Process icacls -ArgumentList "`"C:\Program Files\WindowsApps`" /reset /t /c /q" -Wait -NoNewWindow
+        Write-Host "`n[🛠️] Iniciando reset avançado da Microsoft Store..." -ForegroundColor Yellow
         
-        Write-Host "├─ Etapa 2/3: Executando WSReset..." -ForegroundColor Cyan
-        Start-Process wsreset -NoNewWindow
-        Write-Host "│  Aguardando 30 segundos..." -ForegroundColor DarkGray
-        Start-Sleep -Seconds 30
+        $etapas = @(
+            @{Nome = "Resetando ACLs"; Comando = 'icacls "C:\Program Files\WindowsApps" /reset /t /c /q'},
+            @{Nome = "Executando WSReset"; Comando = 'Start-Process wsreset -NoNewWindow'},
+            @{Nome = "Finalizando processos"; Comando = {'taskkill /IM wsreset.exe,WinStore.App.exe /F'}}
+        )
+
+        foreach ($etapa in $etapas) {
+            Write-Host "├─ $($etapa.Nome)..." -ForegroundColor Cyan
+            if ($etapa.Comando -is [scriptblock]) {
+                & $etapa.Comando | Out-Null
+            }
+            else {
+                Start-Process powershell "-Command $($etapa.Comando)" -Wait -NoNewWindow
+            }
+            if ($etapa.Nome -eq "Executando WSReset") {
+                Write-Host "│  Aguardando conclusão..." -ForegroundColor DarkGray
+                Start-Sleep -Seconds 30
+            }
+        }
         
-        Write-Host "└─ Etapa 3/3: Finalizando processos..." -ForegroundColor Cyan
-        taskkill /IM wsreset.exe /F *>$null
-        taskkill /IM WinStore.App.exe /F *>$null
-        
-        Write-Host "[✅] Processo concluído com sucesso!`n" -ForegroundColor Green
+        Write-Host "[✅] Loja reinicializada com sucesso!`n" -ForegroundColor Green
     }
     catch {
-        Write-Host "[❗] Erro durante o processo: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[❗] Falha no processo: $($_.Exception.Message)" -ForegroundColor Red
     }
-    Read-Host "Pressione Enter para continuar..."
+    finally {
+        Invoke-PressKey
+    }
 }
 
 function Listar-ProgramasInstalados {
-    $dateStamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $fileName = "apps-instalados-$dateStamp.txt"
-    $documentsPath = [Environment]::GetFolderPath("MyDocuments")
-    $filePath = Join-Path -Path $documentsPath -ChildPath $fileName
-
-    Write-Host "`n[🔍] Gerando lista de programas instalados..." -ForegroundColor Yellow
-    
     try {
-        $apps = @()
-        $paths = @(
+        $dateStamp = Get-Date -Format "yyyyMMdd-HHmmss"
+        $fileName = "apps-instalados-$dateStamp.txt"
+        $documentsPath = [Environment]::GetFolderPath("MyDocuments")
+        $filePath = Join-Path -Path $documentsPath -ChildPath $fileName
+
+        Write-Host "`n[🔍] Coletando dados de programas instalados..." -ForegroundColor Yellow
+        
+        $registryPaths = @(
             "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
             "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
         )
 
-        foreach ($path in $paths) {
-            $apps += Get-ItemProperty $path | Where-Object DisplayName -ne $null
-        }
+        $apps = $registryPaths | ForEach-Object {
+            Get-ItemProperty $_ | Where-Object DisplayName -ne $null
+        } | Sort-Object DisplayName
 
         $apps | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate |
-            Sort-Object DisplayName |
             Format-Table -AutoSize |
             Out-File -FilePath $filePath -Width 200
 
-        Write-Host "[📂] Arquivo salvo em: $filePath" -ForegroundColor Green
-        Write-Host "[ℹ️] Total de programas listados: $($apps.Count)" -ForegroundColor Cyan
+        Write-Host "[📂] Relatório gerado: $filePath" -ForegroundColor Green
+        Write-Host "[ℹ️] Programas encontrados: $($apps.Count)" -ForegroundColor Cyan
     }
     catch {
-        Write-Host "[❗] Erro ao gerar lista: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[❗] Erro na geração do relatório: $($_.Exception.Message)" -ForegroundColor Red
     }
-    Read-Host "`nPressione Enter para continuar..."
+    finally {
+        Invoke-PressKey
+    }
 }
 
 function Alterar-NomeComputador {
-    Write-Host "`n[⚠️] Operação sensível - Requer reinicialização!" -ForegroundColor Red
-    $currentName = $env:COMPUTERNAME
-    $newName = Read-Host "`nDigite o novo nome do computador (atual: $currentName)"
-
-    if (-not $newName -or $newName -notmatch "^[a-zA-Z0-9-]{1,15}$") {
-        Write-Host "[❌] Nome inválido! Use até 15 caracteres (A-Z, 0-9, hífen)" -ForegroundColor Red
-        return
-    }
-
     try {
-        Rename-Computer -NewName $newName -Force -ErrorAction Stop
-        Write-Host "[✅] Nome alterado para: $newName" -ForegroundColor Green
+        $currentName = $env:COMPUTERNAME
+        Write-Host "`n[💻] Nome atual do computador: $currentName" -ForegroundColor Cyan
         
-        $choice = Read-Host "`nDeseja reiniciar agora para aplicar as mudanças? [S/N]"
-        if ($choice -eq 'S') {
-            shutdown /r /f /t 15
-            exit
+        do {
+            $newName = Read-Host "`nDigite o novo nome (15 caracteres alfanuméricos)"
+        } until ($newName -match '^[a-zA-Z0-9-]{1,15}$')
+
+        if ((Read-Host "`nConfirma alteração para '$newName'? (S/N)") -eq 'S') {
+            Rename-Computer -NewName $newName -Force -ErrorAction Stop
+            Write-Host "[✅] Nome alterado com sucesso!" -ForegroundColor Green
+            
+            if ((Read-Host "`nReiniciar agora? (S/N)") -eq 'S') {
+                shutdown /r /f /t 15
+                exit
+            }
         }
     }
     catch {
-        Write-Host "[❗] Erro ao renomear: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[❗] Erro na operação: $($_.Exception.Message)" -ForegroundColor Red
     }
-    Read-Host "`nPressione Enter para continuar..."
-}
-
-function Reiniciar-Computador {
-    Write-Host "`n[⚠️] ATENÇÃO: Operação irreversível!" -ForegroundColor Red
-    $confirm = Read-Host "`nTem certeza que deseja reiniciar o computador? (Digite 'CONFIRMAR' para prosseguir)"
-    
-    if ($confirm -eq 'CONFIRMAR') {
-        Write-Host "[⏳] Reiniciando em 15 segundos..." -ForegroundColor Yellow
-        shutdown /r /f /t 15
-        exit
-    }
-    else {
-        Write-Host "[❌] Operação cancelada pelo usuário" -ForegroundColor Red
-        Read-Host "`nPressione Enter para continuar..."
+    finally {
+        Invoke-PressKey
     }
 }
 
 function Aplicar-GPOsFCT {
-    Write-Host "`n[🏛️] Aplicando GPOs da FCT/UFG..." -ForegroundColor DarkMagenta
     try {
-        Write-Host "├─ Etapa 1/2: Aplicando GPO do usuário..." -ForegroundColor Cyan
-        & "\\fog\gpos\lgpo.exe" /t "\\fog\gpos\user.txt" 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Erro na aplicação da GPO do usuário" }
+        Write-Host "`n[🏛️] Conectando ao servidor de políticas..." -ForegroundColor DarkMagenta
+        
+        $gpoPaths = @{
+            User    = "\\fog\gpos\user.txt"
+            Machine = "\\fog\gpos\machine.txt"
+        }
 
-        Write-Host "├─ Etapa 2/2: Aplicando GPO da máquina..." -ForegroundColor Cyan
-        & "\\fog\gpos\lgpo.exe" /t "\\fog\gpos\machine.txt" 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Erro na aplicação da GPO da máquina" }
+        if (-not (Test-Path $gpoPaths.User)) { throw "Arquivo User GPO não encontrado" }
+        if (-not (Test-Path $gpoPaths.Machine)) { throw "Arquivo Machine GPO não encontrado" }
+
+        $gpoPaths.GetEnumerator() | ForEach-Object {
+            Write-Host "├─ Aplicando política $($_.Key)..." -ForegroundColor Cyan
+            & "\\fog\gpos\lgpo.exe" /t $_.Value 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Erro $LASTEXITCODE na aplicação" }
+        }
 
         Write-Host "[✅] Políticas aplicadas com sucesso!" -ForegroundColor Green
-        Write-Host "[⏳] Finalizando em 5 segundos..." -ForegroundColor DarkGray
-        Start-Sleep -Seconds 5
+        Write-Host "[⚠️] Recomenda-se reinicialização do sistema" -ForegroundColor Yellow
     }
     catch {
-        Write-Host "[❗] Falha crítica: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "[⚠️] Verifique a conectividade com o servidor FOG" -ForegroundColor Yellow
+        Write-Host "[❗] Falha na aplicação: $($_.Exception.Message)" -ForegroundColor Red
     }
-    Read-Host "`nPressione Enter para continuar..."
+    finally {
+        Invoke-PressKey
+    }
 }
 
 function Restaurar-PoliticasPadrao {
-    Write-Host "`n[🧹] Restaurando políticas padrão do Windows..." -ForegroundColor DarkYellow
     try {
-        $paths = @(
+        Write-Host "`n[🧹] Iniciando restauração de segurança..." -ForegroundColor DarkYellow
+        
+        $confirm = Read-Host "`nEsta operação REMOVERÁ todas as políticas personalizadas. Continuar? (S/N)"
+        if ($confirm -ne 'S') { return }
+
+        $gpoPaths = @(
             "$env:windir\System32\GroupPolicy",
             "$env:windir\System32\GroupPolicyUsers"
         )
 
-        foreach ($path in $paths) {
-            if (Test-Path $path) {
-                Remove-Item $path -Recurse -Force -ErrorAction Stop
-                Write-Host "├─ [$($path.Split('\')[-1])] Removido com sucesso" -ForegroundColor Green
-            }
-            else {
-                Write-Host "├─ [$($path.Split('\')[-1])] Não encontrado" -ForegroundColor DarkGray
+        $gpoPaths | ForEach-Object {
+            if (Test-Path $_) {
+                Remove-Item $_ -Recurse -Force -ErrorAction Stop
+                Write-Host "├─ [$(Split-Path $_ -Leaf)] Removido" -ForegroundColor Green
             }
         }
 
-        Write-Host "[✅] Restauração concluída com sucesso!" -ForegroundColor Green
+        Write-Host "[✅] Restauração concluída!" -ForegroundColor Green
         Write-Host "[⚠️] Execute a opção 1 para atualizar as políticas" -ForegroundColor Yellow
-        Start-Sleep -Seconds 3
     }
     catch {
-        Write-Host "[❗] Erro durante a operação: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[❗] Erro na restauração: $($_.Exception.Message)" -ForegroundColor Red
     }
-    Read-Host "`nPressione Enter para continuar..."
+    finally {
+        Invoke-PressKey
+    }
 }
 
-# Verificação de administrador
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Host "[⚠️] Elevando privilégios..." -ForegroundColor Yellow
-    Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -Command `"irm https://raw.githubusercontent.com/diegogyn/ScritpsDiversos/refs/heads/master/main.ps1 | iex`"" -Verb RunAs
-    exit
+function Reiniciar-Computador {
+    try {
+        Write-Host "`n[🚨] ATENÇÃO: Esta operação é irreversível!" -ForegroundColor Red
+        if ((Read-Host "`nCONFIRME com 'REINICIAR' para prosseguir") -eq 'REINICIAR') {
+            Write-Host "[⏳] Reinício em 15 segundos..." -ForegroundColor Yellow
+            shutdown /r /f /t 15
+            exit
+        }
+        else {
+            Write-Host "[❌] Operação cancelada" -ForegroundColor Red
+        }
+    }
+    finally {
+        Invoke-PressKey
+    }
 }
 
-# Loop principal
+# Main Execution
+Testar-Admin
+
 while ($true) {
     try {
         Show-Menu
-        $choice = Read-Host "`nDigite a opção desejada [1-8]"
-        
-        switch ($choice) {
+        switch (Read-Host "`nSelecione uma opção [1-8]") {
             '1' { Atualizar-PoliticasGrupo }
             '2' { Reiniciar-LojaWindows }
             '3' { Listar-ProgramasInstalados }
             '4' { Alterar-NomeComputador }
-            '5' { Reiniciar-Computador }
-            '6' { Aplicar-GPOsFCT }
-            '7' { Restaurar-PoliticasPadrao }
+            '5' { Aplicar-GPOsFCT }
+            '6' { Restaurar-PoliticasPadrao }
+            '7' { Reiniciar-Computador }
             '8' { exit }
             default {
                 Write-Host "[❌] Opção inválida!" -ForegroundColor Red
-                Start-Sleep -Seconds 2
+                Start-Sleep -Seconds 1
             }
         }
     }
     catch {
-        Write-Host "[❗] Erro: $($_.Exception.Message)" -ForegroundColor Red
-        Read-Host "Pressione Enter para continuar..."
+        Write-Host "[❗] Erro não tratado: $($_.Exception.Message)" -ForegroundColor Red
+        Invoke-PressKey
     }
 }
