@@ -30,7 +30,7 @@ function Show-Menu {
     Write-Host "══════════════════════════════════════════════════════════" -ForegroundColor Cyan
     Write-Host " 1. 📜 Listar Programas Instalados" -ForegroundColor Magenta
     Write-Host " 2. 💻 Alterar Nome do Computador" -ForegroundColor Cyan
-    Write-Host " 3. 🏛 Aplicar GPOs da FCT" -ForegroundColor DarkMagenta
+    Write-Host " 3. 🏛 Aplicar GPOs da FCT" -ForegroundColor DarkRed
     Write-Host " 4. 🧹 Restaurar GPOs Padrão do Windows" -ForegroundColor DarkYellow
     Write-Host " 5. 🔄 Atualizar GPOs" -ForegroundColor Green
     Write-Host " 6. 🛒 Reset Windows Store" -ForegroundColor Blue
