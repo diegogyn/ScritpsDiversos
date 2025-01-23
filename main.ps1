@@ -30,7 +30,7 @@ function Show-Menu {
     Write-Host "══════════════════════════════════════════════════════════" -ForegroundColor Cyan
     Write-Host " 1. 📜 Listar Programas Instalados" -ForegroundColor Magenta
     Write-Host " 2. 💻 Alterar Nome do Computador" -ForegroundColor Cyan
-    Write-Host " 3. 🏛 Aplicar GPOs da FCT" -ForegroundColor DarkRed
+    Write-Host " 3. 🏛 Aplicar GPOs da FCT" -ForegroundColor Blue
     Write-Host " 4. 🧹 Restaurar GPOs Padrão do Windows" -ForegroundColor DarkYellow
     Write-Host " 5. 🔄 Atualizar GPOs" -ForegroundColor Green
     Write-Host " 6. 🛒 Reset Windows Store" -ForegroundColor Blue
@@ -222,25 +222,85 @@ function Reiniciar-LojaWindows {
 
 function Limpeza-Labs {
     try {
-        Write-Host "`n[🧼] Iniciando limpeza de laboratório..." -ForegroundColor DarkCyan
+        Write-Host "`n[🧼] Iniciando limpeza avançada de laboratório..." -ForegroundColor DarkCyan
+
+        # 1. Limpeza básica do sistema
+        Write-Host "├─ Etapa 1/4: Limpeza básica do sistema..." -ForegroundColor Cyan
+        Remove-Item -Path "$env:TEMP\*", "C:\Windows\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Clear-RecycleBin -Force -ErrorAction SilentlyContinue -Confirm:$false
         
-        # Limpar arquivos temporários
-        Write-Host "├─ Limpando arquivos temporários..." -ForegroundColor Cyan
-        Remove-Item -Path "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path "C:\Windows\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
-        
-        # Limpar a Lixeira
-        Write-Host "├─ Esvaziando a Lixeira..." -ForegroundColor Cyan
-        Clear-RecycleBin -Force -ErrorAction SilentlyContinue
-        
-        # Limpar cache do Store
-        Write-Host "├─ Limpando cache da Loja Windows..." -ForegroundColor Cyan
-        Get-ChildItem -Path "C:\Users\*\AppData\Local\Packages\Microsoft.WindowsStore*" -Recurse | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-        
+        # 2. Processar perfis de usuário
+        Write-Host "├─ Etapa 2/4: Processando perfis de usuário..." -ForegroundColor Cyan
+        $Users = Get-CimInstance -ClassName Win32_UserProfile | Where-Object { 
+            $_.Special -eq $false -and $_.Loaded -eq $false 
+        }
+
+        foreach ($User in $Users) {
+            try {
+                $UserPath = $User.LocalPath
+                $SID = $User.SID
+                
+                Write-Host "│  ├─ Limpando perfil: $(Split-Path $UserPath -Leaf)" -ForegroundColor DarkGray
+
+                # Carregar registry hive do usuário
+                reg load "HKU\$SID" "$UserPath\ntuser.dat" 2>&1 | Out-Null
+
+                # 2.1 Limpeza de arquivos temporários do usuário
+                $UserTempPaths = @(
+                    "$UserPath\AppData\Local\Temp\*",
+                    "$UserPath\AppData\Local\Microsoft\Windows\INetCache\*",
+                    "$UserPath\AppData\Local\Microsoft\Windows\History\*"
+                )
+                Remove-Item $UserTempPaths -Force -Recurse -ErrorAction SilentlyContinue
+
+                # 2.2 Reset navegadores
+                $Browsers = @(
+                    @{ Name = "Chrome"; Path = "$UserPath\AppData\Local\Google\Chrome\User Data\Default" },
+                    @{ Name = "Edge"; Path = "$UserPath\AppData\Local\Microsoft\Edge\User Data\Default" },
+                    @{ Name = "Firefox"; Path = "$UserPath\AppData\Roaming\Mozilla\Firefox\Profiles\*" }
+                )
+
+                foreach ($Browser in $Browsers) {
+                    if (Test-Path $Browser.Path) {
+                        Remove-Item $Browser.Path -Recurse -Force -Exclude 'Bookmarks','Preferences' -ErrorAction SilentlyContinue
+                    }
+                }
+
+                # 2.3 Remover personalizações
+                Remove-Item "$UserPath\Desktop\*", "$UserPath\Downloads\*" -Force -Exclude 'desktop.ini' -ErrorAction SilentlyContinue
+                Remove-Item "$UserPath\AppData\Roaming\Microsoft\Windows\Themes\*" -Force -ErrorAction SilentlyContinue
+
+                # 2.4 Limpar credenciais e configurações
+                cmdkey /list | ForEach-Object { 
+                    if ($_ -like "*Target:*") { cmdkey /del:($_ -split ' ')[2] }
+                }
+
+                # Descarregar registry hive
+                [gc]::Collect()
+                reg unload "HKU\$SID" 2>&1 | Out-Null
+
+            } catch {
+                Write-Host "│  └─ [⚠️] Erro no perfil $UserPath: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+
+        # 3. Reset configurações de sistema
+        Write-Host "├─ Etapa 3/4: Resetando configurações do sistema..." -ForegroundColor Cyan
+        powercfg /restoredefaultschemes | Out-Null
+        netsh winsock reset | Out-Null
+        netsh int ip reset | Out-Null
+
+        # 4. Limpeza profunda do sistema
+        Write-Host "├─ Etapa 4/4: Limpeza profunda do Windows..." -ForegroundColor Cyan
+        Start-Process cleanmgr -ArgumentList "/sagerun:1" -Wait -NoNewWindow
+        DISM /Online /Cleanup-Image /RestoreHealth | Out-Null
+        sfc /scannow | Out-Null
+
         Write-Host "[✅] Limpeza concluída com sucesso!" -ForegroundColor Green
+        Write-Host "[⚠️] Recomenda-se reinicialização do sistema" -ForegroundColor Yellow
     }
     catch {
-        Write-Host "[❗] Erro durante a limpeza: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[❗] Erro crítico durante a limpeza: $($_.Exception.Message)" -ForegroundColor Red
     }
     finally {
         Invoke-PressKey
