@@ -30,7 +30,7 @@ function Import-Functions {
 # Elevar privilégios se necessário
 if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Host "Elevando privilégios..." -ForegroundColor Yellow
-    $scriptCommand = "irm RAW_URL_MAIN | iex"
+    $scriptCommand = "irm https://raw.githubusercontent.com/diegogyn/ScritpsDiversos/refs/heads/master/LabsFCT/main.ps1 | iex"
     Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -Command `"$scriptCommand`"" -Verb RunAs
     exit
 }
