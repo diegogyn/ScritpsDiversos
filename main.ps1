@@ -277,7 +277,7 @@ function Limpeza-Labs {
                 reg unload "HKU\$SID" 2>&1 | Out-Null
 
             } catch {
-                Write-Host "│  └─ [⚠] Erro no perfil $UserPath: $($_.Exception.Message)" -ForegroundColor Red
+		Write-Host "│  └─ [⚠] Erro no perfil ${UserPath}∶ $($_.Exception.Message)" -ForegroundColor Red
             }
         }
 
