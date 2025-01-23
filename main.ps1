@@ -14,12 +14,14 @@
 function Show-Menu {
     Clear-Host
     Write-Host @"  
+    
 	 ██╗   ██╗███████╗ ██████╗ 
 	 ██║   ██║██╔════╝██╔════╝ 
 	 ██║   ██║█████╗  ██║  ███╗
 	 ██║   ██║██╔══╝  ██║   ██║
 	 ╚██████╔╝██║     ╚██████╔╝
 	  ╚═════╝ ╚═╝      ╚═════╝ 
+   
     Universidade Federal de Goiás
 "@ -ForegroundColor Blue
 
