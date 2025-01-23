@@ -60,7 +60,7 @@ function Atualizar-PoliticasGrupo {
             Write-Host "[✅] Atualização concluída: $($output -join ' ')" -ForegroundColor Green
         }
         else {
-            Write-Host "[❌] Erro $LASTEXITCODE: $output" -ForegroundColor Red
+	    Write-Host "[❌] Erro ${LASTEXITCODE}: $output" -ForegroundColor Red
         }
     }
     catch {
