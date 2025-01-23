@@ -280,7 +280,7 @@ function Limpeza-Labs {
                 reg unload "HKU\$SID" 2>&1 | Out-Null
 
             } catch {
-                Write-Host "│  └─ [⚠️] Erro no perfil $UserPath: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "│  └─ [⚠] Erro no perfil $UserPath: $($_.Exception.Message)" -ForegroundColor Red
             }
         }
 
@@ -297,7 +297,7 @@ function Limpeza-Labs {
         sfc /scannow | Out-Null
 
         Write-Host "[✅] Limpeza concluída com sucesso!" -ForegroundColor Green
-        Write-Host "[⚠️] Recomenda-se reinicialização do sistema" -ForegroundColor Yellow
+        Write-Host "[⚠] Recomenda-se reinicialização do sistema" -ForegroundColor Yellow
     }
     catch {
         Write-Host "[❗] Erro crítico durante a limpeza: $($_.Exception.Message)" -ForegroundColor Red
