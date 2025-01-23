@@ -7,7 +7,7 @@
 .DESCRIPTION
     Execute com: irm RAW_URL_MAIN | iex
 .NOTES
-    Versão: 2.0
+    Versão: 2.2
     Autor: Departamento de TI UFG
 #>
 
@@ -46,7 +46,7 @@ function Invoke-PressKey {
 function Testar-Admin {
     if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-Host "[⚠️] Elevando privilégios..." -ForegroundColor Yellow
-        Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -Command `"irm RAW_URL_MAIN | iex`"" -Verb RunAs
+        Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -Command `"irm https://raw.githubusercontent.com/diegogyn/ScritpsDiversos/refs/heads/master/main.ps1 | iex`"" -Verb RunAs
         exit
     }
 }
@@ -60,7 +60,7 @@ function Atualizar-PoliticasGrupo {
             Write-Host "[✅] Atualização concluída: $($output -join ' ')" -ForegroundColor Green
         }
         else {
-	    Write-Host "[❌] Erro ${LASTEXITCODE}: $output" -ForegroundColor Red
+            Write-Host "[❌] Erro ${LASTEXITCODE}: $output" -ForegroundColor Red
         }
     }
     catch {
@@ -76,19 +76,15 @@ function Reiniciar-LojaWindows {
         Write-Host "`n[🛠️] Iniciando reset avançado da Microsoft Store..." -ForegroundColor Yellow
         
         $etapas = @(
-            @{Nome = "Resetando ACLs"; Comando = 'icacls "C:\Program Files\WindowsApps" /reset /t /c /q'},
-            @{Nome = "Executando WSReset"; Comando = 'Start-Process wsreset -NoNewWindow'},
-            @{Nome = "Finalizando processos"; Comando = {'taskkill /IM wsreset.exe,WinStore.App.exe /F'}}
+            @{Nome = "Resetando ACLs"; Comando = { icacls "C:\Program Files\WindowsApps" /reset /t /c /q | Out-Null }},
+            @{Nome = "Executando WSReset"; Comando = { Start-Process wsreset -NoNewWindow }},
+            @{Nome = "Finalizando processos"; Comando = { taskkill /IM wsreset.exe /IM WinStore.App.exe /F | Out-Null }}
         )
 
         foreach ($etapa in $etapas) {
             Write-Host "├─ $($etapa.Nome)..." -ForegroundColor Cyan
-            if ($etapa.Comando -is [scriptblock]) {
-                & $etapa.Comando | Out-Null
-            }
-            else {
-                Start-Process powershell "-Command $($etapa.Comando)" -Wait -NoNewWindow
-            }
+            & $etapa.Comando
+            
             if ($etapa.Nome -eq "Executando WSReset") {
                 Write-Host "│  Aguardando conclusão..." -ForegroundColor DarkGray
                 Start-Sleep -Seconds 30
@@ -180,7 +176,7 @@ function Aplicar-GPOsFCT {
         $gpoPaths.GetEnumerator() | ForEach-Object {
             Write-Host "├─ Aplicando política $($_.Key)..." -ForegroundColor Cyan
             & "\\fog\gpos\lgpo.exe" /t $_.Value 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw "Erro $LASTEXITCODE na aplicação" }
+            if ($LASTEXITCODE -ne 0) { throw "Erro ${LASTEXITCODE} na aplicação" }
         }
 
         Write-Host "[✅] Políticas aplicadas com sucesso!" -ForegroundColor Green
@@ -227,7 +223,8 @@ function Restaurar-PoliticasPadrao {
 function Reiniciar-Computador {
     try {
         Write-Host "`n[🚨] ATENÇÃO: Esta operação é irreversível!" -ForegroundColor Red
-        if ((Read-Host "`nCONFIRME com 'REINICIAR' para prosseguir") -eq 'REINICIAR') {
+        $confirmacao = Read-Host "`nCONFIRME com 'REINICIAR' para prosseguir"
+        if ($confirmacao -eq 'REINICIAR') {
             Write-Host "[⏳] Reinício em 15 segundos..." -ForegroundColor Yellow
             shutdown /r /f /t 15
             exit
