@@ -7,21 +7,19 @@
 .DESCRIPTION
     Execute com: irm RAW_URL_MAIN | iex
 .NOTES
-    Versão: 2.3
+    Versão: 2.4
     Autor: Departamento de TI UFG
 #>
 
 function Show-Menu {
     Clear-Host
     Write-Host @"  
-    
 	 ██╗   ██╗███████╗ ██████╗ 
 	 ██║   ██║██╔════╝██╔════╝ 
 	 ██║   ██║█████╗  ██║  ███╗
 	 ██║   ██║██╔══╝  ██║   ██║
 	 ╚██████╔╝██║     ╚██████╔╝
 	  ╚═════╝ ╚═╝      ╚═════╝ 
-   
     Universidade Federal de Goiás
 "@ -ForegroundColor Blue
 
@@ -33,7 +31,7 @@ function Show-Menu {
     Write-Host " 4. 🧹 Restaurar GPOs Padrão do Windows" -ForegroundColor DarkYellow
     Write-Host " 5. 🔄 Atualizar GPOs" -ForegroundColor Green
     Write-Host " 6. 🛒 Reset Windows Store" -ForegroundColor Blue
-    Write-Host " 7. 🧼 Limpeza de Labs" -ForegroundColor DarkCyan
+    Write-Host " 7. 🧼 Labs Limpeza do Windows" -ForegroundColor DarkCyan
     Write-Host " 8. 🚀 Reiniciar Computador" -ForegroundColor Red
     Write-Host " 9. ❌ Sair do Script" -ForegroundColor DarkGray
     Write-Host "══════════════════════════════════════════════════════════" -ForegroundColor Cyan
@@ -239,48 +237,59 @@ function Limpeza-Labs {
                 $UserPath = $User.LocalPath
                 $SID = $User.SID
                 
-                Write-Host "│  ├─ Limpando perfil: $(Split-Path $UserPath -Leaf)" -ForegroundColor DarkGray
+                Write-Host "│  ├─ Processando: $($UserPath)" -ForegroundColor DarkGray
 
                 # Carregar registry hive
                 reg load "HKU\$SID" "$UserPath\ntuser.dat" 2>&1 | Out-Null
 
-                # 2.1 Limpeza completa sem prompts
+                # 2.1 Pastas críticas para limpeza
                 $PastasParaLimpar = @(
+                    "$UserPath\Desktop\*",
+                    "$UserPath\Downloads\*",
                     "$UserPath\AppData\Local\Temp\*",
                     "$UserPath\AppData\Local\Microsoft\Windows\INetCache\*",
                     "$UserPath\AppData\Local\Microsoft\Windows\History\*",
-                    "$UserPath\AppData\Roaming\Microsoft\Windows\Recent\*"  # Arquivos recentes
+                    "$UserPath\AppData\Roaming\Microsoft\Windows\Recent\*"
                 )
-                
-                # 2.2 Excluir conteúdo mantendo ícones
-                Remove-Item $PastasParaLimpar -Recurse -Force -ErrorAction SilentlyContinue
-                
-                # 2.3 Área de trabalho (exceto íones do sistema)
-                Remove-Item "$UserPath\Desktop\*" -Recurse -Force -Exclude 'desktop.ini', '*.lnk' -ErrorAction SilentlyContinue
-                
-                # 2.4 Downloads (limpeza completa)
-                Remove-Item "$UserPath\Downloads\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-                # 2.5 Reset navegadores
+                # 2.2 Limpeza recursiva forçada
+                foreach ($Pasta in $PastasParaLimpar) {
+                    if (Test-Path $Pasta) {
+                        Remove-Item $Pasta -Recurse -Force -ErrorAction SilentlyContinue -Confirm:$false
+                        Write-Host "│  │  ├─ Limpo: $Pasta" -ForegroundColor DarkCyan
+                    }
+                }
+
+                # 2.3 Preservar ícones do desktop
+                $ItensPreservar = @('desktop.ini', '*.lnk')
+                Get-ChildItem "$UserPath\Desktop" -Exclude $ItensPreservar | 
+                    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+                # 2.4 Reset navegadores
                 $Browsers = @(
-                    @{ Name = "Chrome"; Path = "$UserPath\AppData\Local\Google\Chrome\User Data\Default\*" },
-                    @{ Name = "Edge"; Path = "$UserPath\AppData\Local\Microsoft\Edge\User Data\Default\*" },
+                    @{ Name = "Chrome"; Path = "$UserPath\AppData\Local\Google\Chrome\User Data\Default" },
+                    @{ Name = "Edge"; Path = "$UserPath\AppData\Local\Microsoft\Edge\User Data\Default" },
                     @{ Name = "Firefox"; Path = "$UserPath\AppData\Roaming\Mozilla\Firefox\Profiles\*" }
                 )
 
                 foreach ($Browser in $Browsers) {
                     if (Test-Path $Browser.Path) {
-                        Remove-Item $Browser.Path -Recurse -Force -Exclude 'Bookmarks','Preferences' -ErrorAction SilentlyContinue
+                        Remove-Item "$($Browser.Path)\*" -Recurse -Force -Exclude 'Bookmarks','Preferences' -ErrorAction SilentlyContinue
+                        Write-Host "│  │  ├─ Navegador resetado: $($Browser.Name)" -ForegroundColor DarkMagenta
                     }
                 }
 
-                # 2.6 Credenciais
+                # 2.5 Credenciais
                 cmdkey /list | ForEach-Object { 
-                    if ($_ -like "*Target:*") { cmdkey /del:($_ -split ' ')[2] }
+                    if ($_ -like "*Target:*") { 
+                        cmdkey /del:($_ -split ' ')[2]
+                        Write-Host "│  │  ├─ Credencial removida: $($_ -split ' ')[2]" -ForegroundColor DarkRed
+                    }
                 }
 
                 # Descarregar hive
                 [gc]::Collect()
+                Start-Sleep -Milliseconds 500
                 reg unload "HKU\$SID" 2>&1 | Out-Null
 
             } catch {
