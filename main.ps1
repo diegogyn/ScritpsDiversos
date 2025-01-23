@@ -226,18 +226,25 @@ function Limpeza-Labs {
         Remove-Item -Path "$env:TEMP\*", "C:\Windows\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
         Clear-RecycleBin -Force -ErrorAction SilentlyContinue -Confirm:$false
         
-        # 2. Processar perfis de usuário
-        Write-Host "├─ Etapa 2/4: Processando perfis de usuário..." -ForegroundColor Cyan
-        $Users = Get-CimInstance -ClassName Win32_UserProfile | Where-Object { 
-            $_.Special -eq $false -and $_.Loaded -eq $false 
-        }
+		# 2. Processar perfis de usuário
+		Write-Host "├─ Etapa 2/4: Processando perfis de usuário..." -ForegroundColor Cyan
+		$Users = Get-CimInstance -ClassName Win32_UserProfile | Where-Object { 
+			$_.Special -eq $false -and $_.Loaded -eq $false 
+		}
 
-        foreach ($User in $Users) {
-            try {
-                $UserPath = $User.LocalPath
-                $SID = $User.SID
-                
-                Write-Host "│  ├─ Processando: $($UserPath)" -ForegroundColor DarkGray
+		foreach ($User in $Users) {
+			try {
+				# Ajuste 1: Remover barra final e validar caminho
+				$UserPath = $User.LocalPath.TrimEnd('\')  # Corrige caminhos com barra dupla
+				
+				if (-not (Test-Path $UserPath)) {
+					Write-Host "│  ├─ [⚠] Perfil não encontrado: $UserPath" -ForegroundColor Yellow
+					continue  # Pula para o próximo perfil
+				}
+
+				$SID = $User.SID
+        
+				Write-Host "│  ├─ Processando: $($UserPath)" -ForegroundColor DarkGray
 
                 # Carregar registry hive
                 reg load "HKU\$SID" "$UserPath\ntuser.dat" 2>&1 | Out-Null
