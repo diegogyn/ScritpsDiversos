@@ -32,8 +32,8 @@ function Show-Menu {
     Write-Host " 2. 🛒 Resetar Loja Windows" -ForegroundColor Blue
     Write-Host " 3. 📜 Listar Programas Instalados" -ForegroundColor Magenta
     Write-Host " 4. 💻 Alterar Nome do Computador" -ForegroundColor Cyan
-    Write-Host " 5. 🏛 Aplicar GPOs da FCT" -ForegroundColor DarkMagenta
-    Write-Host " 6. 🧹 Restaurar GPOs Padrão do Windows" -ForegroundColor DarkYellow
+    Write-Host " 5. 🏛 Aplicar GPOs da FCT" -ForegroundColor Green
+    Write-Host " 6. 🧹 Restaurar GPOs Padrão do Windows" -ForegroundColor Blue
     Write-Host " 7. 🚀 Reiniciar Computador" -ForegroundColor Red
     Write-Host " 8. ❌ Sair do Script" -ForegroundColor DarkGray
     Write-Host "══════════════════════════════════════════════════════════" -ForegroundColor Cyan
