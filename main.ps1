@@ -219,108 +219,188 @@ function Reiniciar-LojaWindows {
 
 function Limpeza-Labs {
     try {
-        Write-Host "`n[🧼] Iniciando limpeza avançada de laboratório..." -ForegroundColor DarkCyan
+        $logPath = "C:\Windows\Logs\UFG-Limpeza-Labs"
+        $logFile = "$logPath\Limpeza-Labs-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+        
+        # Criar diretório de logs se não existir
+        if (-not (Test-Path $logPath)) { 
+            New-Item -Path $logPath -ItemType Directory -Force | Out-Null 
+            Write-Host "[📁] Diretório de logs criado: $logPath" -ForegroundColor Cyan
+        }
+
+        # Função auxiliar para registrar logs
+        function Write-Log {
+            param([string]$Message, [string]$Level = "INFO")
+            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            $logEntry = "[$timestamp][$Level] $Message"
+            Add-Content -Path $logFile -Value $logEntry
+            Write-Host $logEntry -ForegroundColor $(switch ($Level) { "ERROR" { "Red" } "WARN" { "Yellow" } default { "White" } })
+        }
+
+        Write-Log "Iniciando limpeza avançada de laboratório..."
 
         # 1. Limpeza básica do sistema
-        Write-Host "├─ Etapa 1/4: Limpeza básica do sistema..." -ForegroundColor Cyan
-        Remove-Item -Path "$env:TEMP\*", "C:\Windows\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
-        Clear-RecycleBin -Force -ErrorAction SilentlyContinue -Confirm:$false
-        
-		# 2. Processar perfis de usuário
-		Write-Host "├─ Etapa 2/4: Processando perfis de usuário..." -ForegroundColor Cyan
-		$Users = Get-CimInstance -ClassName Win32_UserProfile | Where-Object { 
-			$_.Special -eq $false -and $_.Loaded -eq $false 
-		}
-
-		foreach ($User in $Users) {
-			try {
-				# Ajuste 1: Remover barra final e validar caminho
-				$UserPath = $User.LocalPath.TrimEnd('\')  # Corrige caminhos com barra dupla
-				
-				if (-not (Test-Path $UserPath)) {
-					Write-Host "│  ├─ [⚠] Perfil não encontrado: $UserPath" -ForegroundColor Yellow
-					continue  # Pula para o próximo perfil
-				}
-
-				$SID = $User.SID
-        
-				Write-Host "│  ├─ Processando: $($UserPath)" -ForegroundColor DarkGray
-
-                # Carregar registry hive
-                reg load "HKU\$SID" "$UserPath\ntuser.dat" 2>&1 | Out-Null
-
-                # 2.1 Pastas críticas para limpeza
-                $PastasParaLimpar = @(
-                    "$UserPath\Desktop\*",
-                    "$UserPath\Downloads\*",
-                    "$UserPath\AppData\Local\Temp\*",
-                    "$UserPath\AppData\Local\Microsoft\Windows\INetCache\*",
-                    "$UserPath\AppData\Local\Microsoft\Windows\History\*",
-                    "$UserPath\AppData\Roaming\Microsoft\Windows\Recent\*"
-                )
-
-                # 2.2 Limpeza recursiva forçada
-                foreach ($Pasta in $PastasParaLimpar) {
-                    if (Test-Path $Pasta) {
-                        Remove-Item $Pasta -Recurse -Force -ErrorAction SilentlyContinue -Confirm:$false
-                        Write-Host "│  │  ├─ Limpo: $Pasta" -ForegroundColor DarkCyan
-                    }
-                }
-
-                # 2.3 Preservar ícones do desktop
-                $ItensPreservar = @('desktop.ini', '*.lnk')
-                Get-ChildItem "$UserPath\Desktop" -Exclude $ItensPreservar | 
-                    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-
-                # 2.4 Reset navegadores
-                $Browsers = @(
-                    @{ Name = "Chrome"; Path = "$UserPath\AppData\Local\Google\Chrome\User Data\Default" },
-                    @{ Name = "Edge"; Path = "$UserPath\AppData\Local\Microsoft\Edge\User Data\Default" },
-                    @{ Name = "Firefox"; Path = "$UserPath\AppData\Roaming\Mozilla\Firefox\Profiles\*" }
-                )
-
-                foreach ($Browser in $Browsers) {
-                    if (Test-Path $Browser.Path) {
-                        Remove-Item "$($Browser.Path)\*" -Recurse -Force -Exclude 'Bookmarks','Preferences' -ErrorAction SilentlyContinue
-                        Write-Host "│  │  ├─ Navegador resetado: $($Browser.Name)" -ForegroundColor DarkMagenta
-                    }
-                }
-
-                # 2.5 Credenciais
-                cmdkey /list | ForEach-Object { 
-                    if ($_ -like "*Target:*") { 
-                        cmdkey /del:($_ -split ' ')[2]
-                        Write-Host "│  │  ├─ Credencial removida: $($_ -split ' ')[2]" -ForegroundColor DarkRed
-                    }
-                }
-
-                # Descarregar hive
-                [gc]::Collect()
-                Start-Sleep -Milliseconds 500
-                reg unload "HKU\$SID" 2>&1 | Out-Null
-
-            } catch {
-                Write-Host "│  └─ [⚠] Erro no perfil ${UserPath}∶ $($_.Exception.Message)" -ForegroundColor Red
+        Write-Log "Etapa 1/4: Limpeza básica do sistema"
+        try {
+            $tempFolders = @("$env:TEMP\*", "C:\Windows\Temp\*")
+            foreach ($folder in $tempFolders) {
+                Write-Log "Limpando: $folder"
+                Remove-Item -Path $folder -Recurse -Force -ErrorAction Stop
+                Write-Log "Sucesso: $folder limpo"
             }
+            Write-Log "Esvaziando Lixeira"
+            Clear-RecycleBin -Force -ErrorAction Stop -Confirm:$false
+            Write-Log "Lixeira esvaziada"
+        }
+        catch {
+            Write-Log "Falha na limpeza básica: $($_.Exception.Message)" -Level "ERROR"
+        }
+
+        # 2. Processar perfis de usuário
+        Write-Log "Etapa 2/4: Processando perfis de usuário"
+        try {
+            $Users = Get-CimInstance -ClassName Win32_UserProfile | Where-Object { 
+                $_.Special -eq $false -and $_.Loaded -eq $false 
+            }
+            Write-Log "Perfis encontrados: $($Users.Count)"
+
+            foreach ($User in $Users) {
+                try {
+                    $UserPath = $User.LocalPath
+                    $SID = $User.SID
+                    Write-Log "Processando perfil: $UserPath (SID: $SID)"
+
+                    # Carregar registry hive
+                    Write-Log "Carregando hive do registro: $UserPath\ntuser.dat"
+                    reg load "HKU\$SID" "$UserPath\ntuser.dat" 2>&1 | Tee-Object -FilePath $logFile -Append
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Falha ao carregar hive do registro (Código: $LASTEXITCODE)"
+                    }
+
+                    # 2.1 Pastas críticas para limpeza
+                    $PastasParaLimpar = @(
+                        "$UserPath\Desktop\*",
+                        "$UserPath\Downloads\*",
+                        "$UserPath\AppData\Local\Temp\*",
+                        "$UserPath\AppData\Local\Microsoft\Windows\INetCache\*",
+                        "$UserPath\AppData\Local\Microsoft\Windows\History\*",
+                        "$UserPath\AppData\Roaming\Microsoft\Windows\Recent\*"
+                    )
+
+                    foreach ($Pasta in $PastasParaLimpar) {
+                        try {
+                            if (Test-Path $Pasta) {
+                                Write-Log "Limpando: $Pasta"
+                                Remove-Item $Pasta -Recurse -Force -ErrorAction Stop -Confirm:$false
+                                Write-Log "Sucesso: $Pasta limpo"
+                            }
+                        }
+                        catch {
+                            Write-Log "Erro ao limpar $Pasta: $($_.Exception.Message)" -Level "ERROR"
+                        }
+                    }
+
+                    # 2.3 Preservar ícones do desktop
+                    try {
+                        Write-Log "Preservando ícones do desktop"
+                        $ItensPreservar = @('desktop.ini', '*.lnk')
+                        Get-ChildItem "$UserPath\Desktop" -Exclude $ItensPreservar | 
+                            Remove-Item -Recurse -Force -ErrorAction Stop
+                    }
+                    catch {
+                        Write-Log "Erro ao processar desktop: $($_.Exception.Message)" -Level "ERROR"
+                    }
+
+                    # 2.4 Reset navegadores
+                    $Browsers = @(
+                        @{ Name = "Chrome"; Path = "$UserPath\AppData\Local\Google\Chrome\User Data\Default" },
+                        @{ Name = "Edge"; Path = "$UserPath\AppData\Local\Microsoft\Edge\User Data\Default" },
+                        @{ Name = "Firefox"; Path = "$UserPath\AppData\Roaming\Mozilla\Firefox\Profiles\*" }
+                    )
+
+                    foreach ($Browser in $Browsers) {
+                        try {
+                            if (Test-Path $Browser.Path) {
+                                Write-Log "Resetando $($Browser.Name): $($Browser.Path)"
+                                Remove-Item "$($Browser.Path)\*" -Recurse -Force -Exclude 'Bookmarks','Preferences' -ErrorAction Stop
+                                Write-Log "Sucesso: $($Browser.Name) resetado"
+                            }
+                        }
+                        catch {
+                            Write-Log "Erro ao resetar $($Browser.Name): $($_.Exception.Message)" -Level "ERROR"
+                        }
+                    }
+
+                    # 2.5 Credenciais
+                    try {
+                        Write-Log "Removendo credenciais armazenadas"
+                        $credenciais = cmdkey /list | Where-Object { $_ -like "*Target:*" }
+                        foreach ($credencial in $credenciais) {
+                            $target = ($credencial -split ' ')[2]
+                            cmdkey /del:$target 2>&1 | Tee-Object -FilePath $logFile -Append
+                            Write-Log "Credencial removida: $target"
+                        }
+                    }
+                    catch {
+                        Write-Log "Erro ao remover credenciais: $($_.Exception.Message)" -Level "ERROR"
+                    }
+
+                    # Descarregar hive
+                    Write-Log "Descarregando hive do registro"
+                    [gc]::Collect()
+                    Start-Sleep -Milliseconds 500
+                    reg unload "HKU\$SID" 2>&1 | Tee-Object -FilePath $logFile -Append
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Falha ao descarregar hive (Código: $LASTEXITCODE)"
+                    }
+                }
+                catch {
+                    Write-Log "Erro no perfil $UserPath: $($_.Exception.Message)" -Level "ERROR"
+                }
+            }
+        }
+        catch {
+            Write-Log "Falha geral no processamento de perfis: $($_.Exception.Message)" -Level "ERROR"
         }
 
         # 3. Reset configurações
-        Write-Host "├─ Etapa 3/4: Resetando configurações..." -ForegroundColor Cyan
-        powercfg /restoredefaultschemes | Out-Null
-        netsh winsock reset | Out-Null
-        netsh int ip reset | Out-Null
+        Write-Log "Etapa 3/4: Resetando configurações do sistema"
+        try {
+            Write-Log "Resetando esquemas de energia"
+            powercfg /restoredefaultschemes 2>&1 | Tee-Object -FilePath $logFile -Append
+            
+            Write-Log "Resetando Winsock"
+            netsh winsock reset 2>&1 | Tee-Object -FilePath $logFile -Append
+            
+            Write-Log "Resetando configurações IP"
+            netsh int ip reset 2>&1 | Tee-Object -FilePath $logFile -Append
+        }
+        catch {
+            Write-Log "Erro ao resetar configurações: $($_.Exception.Message)" -Level "ERROR"
+        }
 
         # 4. Limpeza profunda
-        Write-Host "├─ Etapa 4/4: Limpeza profunda..." -ForegroundColor Cyan
-        Start-Process cleanmgr -ArgumentList "/sagerun:1" -Wait -NoNewWindow
-        DISM /Online /Cleanup-Image /RestoreHealth | Out-Null
-        sfc /scannow | Out-Null
+        Write-Log "Etapa 4/4: Limpeza profunda do sistema"
+        try {
+            Write-Log "Executando cleanmgr"
+            Start-Process cleanmgr -ArgumentList "/sagerun:1" -Wait -NoNewWindow -PassThru | Out-Null
+            
+            Write-Log "Executando DISM"
+            DISM /Online /Cleanup-Image /RestoreHealth 2>&1 | Tee-Object -FilePath $logFile -Append
+            
+            Write-Log "Executando SFC"
+            sfc /scannow 2>&1 | Tee-Object -FilePath $logFile -Append
+        }
+        catch {
+            Write-Log "Erro na limpeza profunda: $($_.Exception.Message)" -Level "ERROR"
+        }
 
-        Write-Host "[✅] Limpeza concluída com sucesso!" -ForegroundColor Green
+        Write-Log "Limpeza concluída com sucesso!"
+        Write-Host "[⚠] Log detalhado disponível em: $logFile" -ForegroundColor Yellow
         Write-Host "[⚠] Recomenda-se reinicialização" -ForegroundColor Yellow
     }
     catch {
-        Write-Host "[❗] Erro crítico: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Log "Erro crítico: $($_.Exception.Message)" -Level "ERROR"
     }
     finally {
         Invoke-PressKey
