@@ -248,9 +248,10 @@ function Limpeza-Labs {
         netsh advfirewall reset | Out-Null
         ipconfig /flushdns | Out-Null
 
-        # 4. Remoção de contas Microsoft
+        # 4. Remoção de contas Microsoft (Versão Atualizada)
         Write-Host "├─ Removendo contas Microsoft..." -ForegroundColor Yellow
-        Get-WmiObject Win32_UserAccount -ErrorAction SilentlyContinue | Where-Object { 
+        Get-CimInstance -ClassName Win32_UserAccount -ErrorAction SilentlyContinue | 
+        Where-Object { 
             $_.Caption -like "*@*" -and $_.LocalAccount -eq $false
         } | ForEach-Object {
             net user $_.Name /delete 2>$null
@@ -260,11 +261,23 @@ function Limpeza-Labs {
         Write-Host "├─ Restaurando temas padrão..." -ForegroundColor Yellow
         Get-ChildItem "C:\Users\*\AppData\Local\Microsoft\Windows\Themes\*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
         reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes" /v CurrentTheme /f 2>$null
-        reg add "HKCU\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d "" /f 2>$null
 
-        # 6. Limpeza final
+        # 6. Limpeza final (Versão Aprimorada)
         Write-Host "├─ Executando limpeza final..." -ForegroundColor Yellow
-        Start-Process -FilePath cleanmgr -ArgumentList "/sagerun:1" -Wait -WindowStyle Hidden
+        Write-Host "│  Executando Disk Cleanup..." -ForegroundColor DarkGray
+        Start-Process cleanmgr -ArgumentList "/sagerun:1" -Wait -WindowStyle Hidden
+        
+        Write-Host "│  Esvaziando Lixeira..." -ForegroundColor DarkGray
+        Clear-RecycleBin -DriveLetter $env:SYSTEMDRIVE[0] -Force -ErrorAction SilentlyContinue
+
+        Write-Host "│  Verificando saúde do sistema..." -ForegroundColor DarkGray
+        try {
+            DISM /Online /Cleanup-Image /RestoreHealth | Out-Null
+            sfc /scannow | Out-Null
+        }
+        catch {
+            Write-Host "[❗] Erro na verificação do sistema: $($_.Exception.Message)" -ForegroundColor Red
+        }
 
         Write-Host "`n[✅] Limpeza concluída com sucesso!" -ForegroundColor Green
         Write-Host "[⚠] Recomendado reiniciar o computador" -ForegroundColor Yellow
