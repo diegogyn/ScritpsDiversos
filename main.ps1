@@ -292,7 +292,7 @@ function Limpeza-Labs {
                             if (Test-Path $Pasta) {
                                 Write-Log "Limpando: $Pasta"
                                 Remove-Item $Pasta -Recurse -Force -ErrorAction Stop -Confirm:$false
-                                Write-Log "Sucesso: $Pasta limpo"
+                                Write-Log "Sucesso:" $Pasta
                             }
                         }
                         catch {
