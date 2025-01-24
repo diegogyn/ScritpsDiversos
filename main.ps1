@@ -7,20 +7,25 @@
 .DESCRIPTION
     Execute com: irm RAW_URL_MAIN | iex
 .NOTES
-    Versão: 2.4
+    Versão: 2.5
     Autor: Departamento de TI UFG
 #>
 
 function Show-Menu {
     Clear-Host
     Write-Host @"  
+
+
 	 ██╗   ██╗███████╗ ██████╗ 
 	 ██║   ██║██╔════╝██╔════╝ 
 	 ██║   ██║█████╗  ██║  ███╗
 	 ██║   ██║██╔══╝  ██║   ██║
 	 ╚██████╔╝██║     ╚██████╔╝
 	  ╚═════╝ ╚═╝      ╚═════╝ 
+    
     Universidade Federal de Goiás
+	Faculdade de Ciências e Tecnologia
+
 "@ -ForegroundColor Blue
 
     Write-Host "`n          Campus Aparecida`n" -ForegroundColor Yellow
@@ -248,7 +253,7 @@ function Limpeza-Labs {
         netsh advfirewall reset | Out-Null
         ipconfig /flushdns | Out-Null
 
-        # 4. Remoção de contas Microsoft (Versão Atualizada)
+        # 4. Remoção de contas Microsoft 
         Write-Host "├─ Removendo contas Microsoft..." -ForegroundColor Yellow
         Get-CimInstance -ClassName Win32_UserAccount -ErrorAction SilentlyContinue | 
         Where-Object { 
@@ -264,11 +269,11 @@ function Limpeza-Labs {
 
         # 6. Limpeza final (Versão Aprimorada)
         Write-Host "├─ Executando limpeza final..." -ForegroundColor Yellow
-        Write-Host "│  Executando Disk Cleanup..." -ForegroundColor DarkGray
         Start-Process cleanmgr -ArgumentList "/sagerun:1" -Wait -WindowStyle Hidden
         
         Write-Host "│  Esvaziando Lixeira..." -ForegroundColor DarkGray
-        Clear-RecycleBin -DriveLetter $env:SYSTEMDRIVE[0] -Force -ErrorAction SilentlyContinue
+        Clear-RecycleBin -Force -ErrorAction SilentlyContinue
+		
 
         Write-Host "│  Verificando saúde do sistema..." -ForegroundColor DarkGray
         try {
