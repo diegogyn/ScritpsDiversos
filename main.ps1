@@ -219,101 +219,58 @@ function Reiniciar-LojaWindows {
 
 function Limpeza-Labs {
     try {
-        $logPath = "C:\Windows\Logs\UFG-Limpeza-Labs"
-        $logFile = "$logPath\Limpeza-Labs-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
-        
-        if (-not (Test-Path $logPath)) { 
-            New-Item -Path $logPath -ItemType Directory -Force | Out-Null 
-            Write-Host "[📁] Diretório de logs criado: $logPath" -ForegroundColor Cyan
-        }
+        Write-Host "`n[🧼] Iniciando limpeza completa do Windows e usuários..." -ForegroundColor DarkCyan
 
-        function Write-Log {
-            param([string]$Message, [string]$Level = "INFO")
-            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-            $logEntry = "[$timestamp][$Level] $Message"
-            Add-Content -Path $logFile -Value $logEntry
-            Write-Host $logEntry -ForegroundColor $(switch ($Level) { "ERROR" { "Red" } "WARN" { "Yellow" } default { "White" } })
-        }
+        # 1. Limpeza de arquivos temporários
+        Write-Host "├─ Limpando arquivos temporários..." -ForegroundColor Yellow
+        Get-ChildItem "C:\Users\*\AppData\Local\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        Get-ChildItem "C:\Users\*\Downloads\*" -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne "desktop.ini" } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        Get-ChildItem "C:\Users\*\Desktop\*" -ErrorAction SilentlyContinue | Where-Object { $_.Extension -ne ".lnk" } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
-        Write-Log "Iniciando limpeza avançada de laboratório..."
-
-        # 1. Limpeza básica do sistema
-        Write-Log "Etapa 1/4: Limpeza básica do sistema"
-        try {
-            $tempFolders = @("$env:TEMP\*", "C:\Windows\Temp\*")
-            foreach ($folder in $tempFolders) {
-                Write-Log "Limpando: $folder"
-                Remove-Item -Path $folder -Recurse -Force -ErrorAction Stop
-                Write-Log "Sucesso: $folder limpo"
-            }
-            Write-Log "Esvaziando Lixeira"
-            Clear-RecycleBin -Force -ErrorAction Stop -Confirm:$false
-            Write-Log "Lixeira esvaziada"
-        }
-        catch {
-            Write-Log "Falha na limpeza básica: $($_.Exception.Message)" -Level "ERROR"
-        }
-
-        # 2. Processar perfis de usuário (trecho corrigido)
-        Write-Log "Etapa 2/4: Processando perfis de usuário"
-        try {
-            $Users = Get-CimInstance -ClassName Win32_UserProfile | Where-Object { 
-                $_.Special -eq $false -and $_.Loaded -eq $false 
-            }
-            Write-Log "Perfis encontrados: $($Users.Count)"
-
-            foreach ($User in $Users) {
-                try {
-                    $UserPath = $User.LocalPath
-                    $SID = $User.SID
-                    Write-Log "Processando perfil: ${UserPath} (SID: ${SID})"  # Corrigido
-
-                    # Carregar registry hive
-                    Write-Log "Carregando hive do registro: ${UserPath}\ntuser.dat"  # Corrigido
-                    reg load "HKU\${SID}" "${UserPath}\ntuser.dat" 2>&1 | Tee-Object -FilePath $logFile -Append
-                    if ($LASTEXITCODE -ne 0) {
-                        throw "Falha ao carregar hive do registro (Código: ${LASTEXITCODE})"
-                    }
-
-                    # 2.1 Pastas críticas para limpeza
-                    $PastasParaLimpar = @(
-                        "${UserPath}\Desktop\*",
-                        "${UserPath}\Downloads\*",
-                        "${UserPath}\AppData\Local\Temp\*",
-                        "${UserPath}\AppData\Local\Microsoft\Windows\INetCache\*",
-                        "${UserPath}\AppData\Local\Microsoft\Windows\History\*",
-                        "${UserPath}\AppData\Roaming\Microsoft\Windows\Recent\*"
-                    )
-
-                    foreach ($Pasta in $PastasParaLimpar) {
-                        try {
-                            if (Test-Path $Pasta) {
-                                Write-Log "Limpando: ${Pasta}"  # Corrigido
-                                Remove-Item $Pasta -Recurse -Force -ErrorAction Stop -Confirm:$false
-                                Write-Log "Sucesso: ${Pasta} limpo"  # Corrigido
-                            }
-                        }
-                        catch {
-                            Write-Log "Erro ao limpar ${Pasta}: $($_.Exception.Message)" -Level "ERROR"  # Corrigido
-                        }
-                    }
-
-                    # ... (restante do código mantido igual)
-
-                }
-                catch {
-                    Write-Log "Erro no perfil ${UserPath}: $($_.Exception.Message)" -Level "ERROR"  # Corrigido
-                }
+        # 2. Reset de navegadores
+        Write-Host "├─ Resetando navegadores..." -ForegroundColor Yellow
+        $browsers = @(
+            "$env:LOCALAPPDATA\Google\Chrome",
+            "$env:LOCALAPPDATA\Microsoft\Edge",
+            "$env:APPDATA\Mozilla\Firefox"
+        )
+        foreach ($browser in $browsers) {
+            if (Test-Path $browser) {
+                Remove-Item "$browser\*" -Recurse -Force -ErrorAction SilentlyContinue
             }
         }
-        catch {
-            Write-Log "Falha geral no processamento de perfis: $($_.Exception.Message)" -Level "ERROR"
+
+        # 3. Reset de energia e rede
+        Write-Host "├─ Restaurando configurações de energia e rede..." -ForegroundColor Yellow
+        powercfg /restoredefaultschemes | Out-Null
+        netsh winsock reset | Out-Null
+        netsh int ip reset | Out-Null
+        netsh advfirewall reset | Out-Null
+        ipconfig /flushdns | Out-Null
+
+        # 4. Remoção de contas Microsoft
+        Write-Host "├─ Removendo contas Microsoft..." -ForegroundColor Yellow
+        Get-WmiObject Win32_UserAccount -ErrorAction SilentlyContinue | Where-Object { 
+            $_.Caption -like "*@*" -and $_.LocalAccount -eq $false
+        } | ForEach-Object {
+            net user $_.Name /delete 2>$null
         }
 
-        # ... (restante da função mantido igual)
+        # 5. Restauração de temas visuais
+        Write-Host "├─ Restaurando temas padrão..." -ForegroundColor Yellow
+        Get-ChildItem "C:\Users\*\AppData\Local\Microsoft\Windows\Themes\*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+        reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Themes" /v CurrentTheme /f 2>$null
+        reg add "HKCU\Control Panel\Desktop" /v Wallpaper /t REG_SZ /d "" /f 2>$null
+
+        # 6. Limpeza final
+        Write-Host "├─ Executando limpeza final..." -ForegroundColor Yellow
+        Start-Process -FilePath cleanmgr -ArgumentList "/sagerun:1" -Wait -WindowStyle Hidden
+
+        Write-Host "`n[✅] Limpeza concluída com sucesso!" -ForegroundColor Green
+        Write-Host "[⚠] Recomendado reiniciar o computador" -ForegroundColor Yellow
     }
     catch {
-        Write-Log "Erro crítico: $($_.Exception.Message)" -Level "ERROR"
+        Write-Host "[❗] Erro durante a limpeza: $($_.Exception.Message)" -ForegroundColor Red
     }
     finally {
         Invoke-PressKey
