@@ -14,8 +14,8 @@
 function Show-Menu {
     Clear-Host
     Write-Host @"  
-
-
+    
+    
 	 ██╗   ██╗███████╗ ██████╗ 
 	 ██║   ██║██╔════╝██╔════╝ 
 	 ██║   ██║█████╗  ██║  ███╗
@@ -24,7 +24,7 @@ function Show-Menu {
 	  ╚═════╝ ╚═╝      ╚═════╝ 
     
     Universidade Federal de Goiás
-	Faculdade de Ciências e Tecnologia
+    Faculdade de Ciências e Tecnologia
 
 "@ -ForegroundColor Blue
 
@@ -34,9 +34,9 @@ function Show-Menu {
     Write-Host " 2. 💻 Alterar Nome do Computador" -ForegroundColor Cyan
     Write-Host " 3. 🏛 Aplicar GPOs da FCT" -ForegroundColor Blue
     Write-Host " 4. 🧹 Restaurar GPOs Padrão do Windows" -ForegroundColor DarkYellow
-    Write-Host " 5. 🔄 Atualizar GPOs" -ForegroundColor Green
-    Write-Host " 6. 🛒 Reset Windows Store" -ForegroundColor Blue
-    Write-Host " 7. 🧼 Labs Limpeza do Windows" -ForegroundColor DarkCyan
+    Write-Host " 5. 🔄 Atualizar GPOs (Usar após aplicar ou restaurar as GPOs)" -ForegroundColor Green
+    Write-Host " 6. 🛒 Reset Windows Store (Usar após aplicar GPOs)" -ForegroundColor Blue
+    Write-Host " 7. 🧼 Labs Limpeza Geral do Windows (Beta)" -ForegroundColor DarkCyan
     Write-Host " 8. 🚀 Reiniciar Computador" -ForegroundColor Red
     Write-Host " 9. ❌ Sair do Script" -ForegroundColor DarkGray
     Write-Host "══════════════════════════════════════════════════════════" -ForegroundColor Cyan
